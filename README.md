@@ -152,10 +152,26 @@ npm run db:generate   # writes a new SQL file into ./drizzle
 npm run db:migrate
 ```
 
-Re-running the seed is safe. Cars are upserted on their `slug`, and the admin is
-upserted on its email — which also means **re-seeding resets the admin password**
-to `SEED_ADMIN_PASSWORD`. That is the intended password-reset path for this
-internal tool.
+Re-running the seed is safe, which is what lets it run on every deploy. Cars are
+upserted on their `slug`, and the admin account is inserted only if that email
+does not already exist — an existing account is never modified.
+
+### Changing the admin password
+
+There is no password-change screen (the app was scoped to a single seeded
+admin). To change it, run the seed once with the reset flag set:
+
+```bash
+DATABASE_URL="<pooled neon string>" \
+SEED_ADMIN_EMAIL="you@yourcompany.com" \
+SEED_ADMIN_PASSWORD="<the new password>" \
+SEED_ADMIN_RESET_PASSWORD=true \
+  npm run db:seed
+```
+
+On Vercel you can instead add `SEED_ADMIN_RESET_PASSWORD=true` alongside a new
+`SEED_ADMIN_PASSWORD`, redeploy once, then **remove the flag again** so later
+deploys stop overwriting the password.
 
 There are two migrations:
 
@@ -193,9 +209,27 @@ git push -u origin main
    | `DATABASE_URL` | your pooled Neon string |
    | `AUTH_SECRET` | output of `openssl rand -base64 32` |
    | `AUTH_TRUST_HOST` | `true` |
+   | `SEED_ADMIN_EMAIL` | the email you want to log in with |
+   | `SEED_ADMIN_PASSWORD` | a strong password |
 
    Apply them to **Production**, **Preview** and **Development**.
+
+   > Do not skip the two `SEED_ADMIN_*` values. The deploy runs the seed, and
+   > without them your live site gets `admin@example.com` / `changeme123`.
 4. Deploy.
+
+Vercel runs the `vercel-build` script, which applies migrations and seeds
+before building:
+
+```
+npm run db:migrate && npm run db:seed && next build
+```
+
+So the schema, the 6 cars and your admin account are all created by the first
+deploy — **steps 4 and 5 below are only needed if you prefer to run them
+yourself.** Both commands are safe on every redeploy: migrations already
+applied are skipped, cars are upserted, and an existing admin account is left
+untouched (see [Changing the admin password](#changing-the-admin-password)).
 
 > Alternatively, use the Vercel **Neon integration** (Storage → Neon), which
 > creates the database and injects `DATABASE_URL` for you. If you do, confirm
@@ -210,9 +244,10 @@ You can ignore the `CompressionStream ... not supported in the Edge Runtime`
 build warning. It comes from an unused code path in `jose` (a dependency of
 Auth.js) and does not affect the deployment.
 
-### 4. Run the migrations and seed against production
+### 4. (Optional) Run the migrations and seed yourself
 
-From your machine, pointed at the production database:
+Only needed if you want to run them by hand instead of letting the deploy do
+it. From your machine, pointed at the production database:
 
 ```bash
 DATABASE_URL="<your pooled neon string>" npm run db:migrate

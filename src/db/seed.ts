@@ -96,27 +96,37 @@ async function main() {
     console.log(`  • ${car.name}`);
   }
 
+  // The seed runs on every Vercel deploy, so by default it must never disturb
+  // an account that already exists. Setting SEED_ADMIN_RESET_PASSWORD=true
+  // opts into overwriting the password — that is the password-reset path.
+  const resetPassword = process.env.SEED_ADMIN_RESET_PASSWORD === "true";
+
   console.log("Seeding admin account ...");
   const passwordHash = await hash(adminPassword, 10);
-  await db
-    .insert(users)
-    .values({
-      email: adminEmail,
-      passwordHash,
-      name: adminName,
-      role: "ADMIN",
-    })
-    // Re-running the seed resets the admin password to SEED_ADMIN_PASSWORD,
-    // which doubles as the password-reset path for this internal tool.
-    .onConflictDoUpdate({
-      target: users.email,
-      set: { passwordHash, name: adminName, role: "ADMIN" },
-    });
+  const insert = db.insert(users).values({
+    email: adminEmail,
+    passwordHash,
+    name: adminName,
+    role: "ADMIN",
+  });
 
+  await (resetPassword
+    ? insert.onConflictDoUpdate({
+        target: users.email,
+        set: { passwordHash, name: adminName, role: "ADMIN" },
+      })
+    : insert.onConflictDoNothing({ target: users.email }));
+
+  // The password is deliberately not logged: this output ends up in Vercel's
+  // build logs.
   console.log(`\nSeed complete.`);
   console.log(`  Login: ${adminEmail}`);
-  console.log(`  Password: ${adminPassword}`);
-  console.log(`  Change this password after your first login.\n`);
+  console.log(
+    resetPassword
+      ? "  Password was reset to the current SEED_ADMIN_PASSWORD."
+      : "  Password: unchanged if the account already existed, otherwise SEED_ADMIN_PASSWORD.",
+  );
+  console.log("");
 }
 
 main().catch((error) => {
