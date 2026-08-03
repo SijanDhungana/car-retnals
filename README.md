@@ -201,6 +201,15 @@ git push -u origin main
 > creates the database and injects `DATABASE_URL` for you. If you do, confirm
 > the injected value is the *pooled* string.
 
+`DATABASE_URL` and `AUTH_SECRET` are **runtime** variables — the database
+connection is created on first query, not at import time, so `next build`
+succeeds without them. The app will still fail at runtime if they are missing,
+so set them before you expect the deployment to work.
+
+You can ignore the `CompressionStream ... not supported in the Edge Runtime`
+build warning. It comes from an unused code path in `jose` (a dependency of
+Auth.js) and does not affect the deployment.
+
 ### 4. Run the migrations and seed against production
 
 From your machine, pointed at the production database:
