@@ -1,24 +1,20 @@
 import { z } from "zod";
 
 /**
- * The buttons shown on the "send" screen. Edit this list to match what the
- * downstairs kitchen actually makes — anything not listed can still be typed
- * in with "Something else".
+ * The buttons shown on the "send" screen: the Savory section of the Craves
+ * menu. Items with `pastramiAddOn` get an "Add pastrami" toggle.
  */
-export const FOOD_MENU = [
-  "Samosa",
-  "Sausage roll",
-  "Pasty",
-  "Pie",
-  "Quiche",
-  "Spring roll",
-  "Pakora",
-  "Toastie",
-  "Panini",
-  "Wrap",
-  "Sandwich",
-  "Chips",
-] as const;
+export const FOOD_MENU: { name: string; pastramiAddOn?: boolean }[] = [
+  { name: "Egg Avocado Toast", pastramiAddOn: true },
+  { name: "Egg & Cheese English Muffin", pastramiAddOn: true },
+  { name: "Turkey Melt" },
+  { name: "Pastrami Melt" },
+  { name: "Chicken Fajita Wrap" },
+  { name: "Pesto Grilled Cheese" },
+  { name: "Tuna Sandwich" },
+];
+
+export type FoodMenuItem = (typeof FOOD_MENU)[number];
 
 /** How far back the receiving screen looks when it first opens. */
 export const FOOD_HISTORY_HOURS = 16;
@@ -52,7 +48,14 @@ export function describeOrder(order: Pick<FoodOrderDto, "item" | "quantity">) {
 
 /** Rough English plural so "2 Sausage roll" is read as "2 sausage rolls". */
 function plural(item: string) {
-  const word = item.toLowerCase();
+  // "Egg Avocado Toast with Pastrami" → pluralise only the part before "with".
+  const [main, ...rest] = item.split(" with ");
+  const extra = rest.length ? ` with ${rest.join(" with ")}` : "";
+  const word = main.toLowerCase();
+  return pluralWord(word) + extra.toLowerCase();
+}
+
+function pluralWord(word: string) {
   if (/(s|x|z|ch|sh)$/.test(word)) return word.endsWith("s") ? word : `${word}es`;
   if (/[^aeiou]y$/.test(word)) return `${word.slice(0, -1)}ies`;
   return `${word}s`;

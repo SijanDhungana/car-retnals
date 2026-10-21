@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import type { FoodMenuItem } from "@/lib/food";
 
-const OTHER = "__other__";
-
-export default function SendForm({ menu }: { menu: string[] }) {
+export default function SendForm({ menu }: { menu: FoodMenuItem[] }) {
   const [selected, setSelected] = useState<string | null>(null);
-  const [otherText, setOtherText] = useState("");
+  const [pastrami, setPastrami] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [name, setName] = useState("");
   const [sending, setSending] = useState(false);
@@ -15,7 +14,13 @@ export default function SendForm({ menu }: { menu: string[] }) {
     null,
   );
 
-  const item = selected === OTHER ? otherText.trim() : selected;
+  const selectedItem = menu.find((entry) => entry.name === selected);
+  const canAddPastrami = Boolean(selectedItem?.pastramiAddOn);
+  const item = selected
+    ? canAddPastrami && pastrami
+      ? `${selected} with Pastrami`
+      : selected
+    : null;
 
   async function send() {
     if (!item || sending) return;
@@ -36,7 +41,7 @@ export default function SendForm({ menu }: { menu: string[] }) {
         text: `Sent: ${quantity > 1 ? `${quantity} × ` : ""}${item}${name.trim() ? ` for ${name.trim()}` : ""}`,
       });
       setSelected(null);
-      setOtherText("");
+      setPastrami(false);
       setQuantity(1);
       setName("");
     } catch (error) {
@@ -60,39 +65,38 @@ export default function SendForm({ menu }: { menu: string[] }) {
 
       <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Item</h2>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {[...menu, OTHER].map((entry) => {
-          const active = selected === entry;
+        {menu.map((entry) => {
+          const active = selected === entry.name;
           return (
             <button
-              key={entry}
+              key={entry.name}
               type="button"
-              onClick={() => setSelected(entry)}
+              onClick={() => {
+                setSelected(entry.name);
+                setPastrami(false);
+              }}
               className={`min-h-16 rounded-xl border-2 px-3 py-3 text-lg font-semibold transition ${
                 active
                   ? "border-orange-500 bg-orange-500 text-white"
                   : "border-slate-200 bg-white text-slate-900"
               }`}
             >
-              {entry === OTHER ? "Something else…" : entry}
+              {entry.name}
             </button>
           );
         })}
       </div>
 
-      {selected === OTHER && (
-        <div className="mt-3">
-          <label htmlFor="other" className="field-label">
-            What is it?
-          </label>
+      {canAddPastrami && (
+        <label className="mt-3 flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border-2 border-slate-200 bg-white px-4 text-lg font-semibold">
           <input
-            id="other"
-            className="field-input text-lg"
-            value={otherText}
-            maxLength={60}
-            autoFocus
-            onChange={(event) => setOtherText(event.target.value)}
+            type="checkbox"
+            className="h-6 w-6 accent-orange-500"
+            checked={pastrami}
+            onChange={(event) => setPastrami(event.target.checked)}
           />
-        </div>
+          Add pastrami
+        </label>
       )}
 
       <h2 className="mb-2 mt-6 text-sm font-semibold uppercase tracking-wide text-slate-500">

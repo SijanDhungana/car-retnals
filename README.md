@@ -53,7 +53,8 @@ A stand-in for the broken kitchen call button. Anyone with the link can use it.
 | `/food/send` | Downstairs kitchen: pick an item, how many, optional name, **Send**. |
 | `/food/receive` | Upstairs: shows the last 16 hours of orders and reads each new one out loud (tap **Turn on sound** once after opening). |
 
-Edit the item buttons in `src/lib/food.ts` (`FOOD_MENU`). Orders are stored in
+The item buttons are the Savory section of the Craves menu; edit them in
+`src/lib/food.ts` (`FOOD_MENU`). Orders are stored in
 the `food_orders` table (migration `drizzle/0002_food_orders.sql`, applied
 automatically on deploy).
 
