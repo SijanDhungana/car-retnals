@@ -44,6 +44,19 @@ The fleet is a fixed list of six vehicles, inserted by the seed script:
 - BMW M340i
 - Hyundai Elantra
 
+### Food call system (public, no login)
+
+A stand-in for the broken kitchen call button. Anyone with the link can use it.
+
+| Page | Who uses it |
+| --- | --- |
+| `/food/send` | Downstairs kitchen: pick an item, how many, optional name, **Send**. |
+| `/food/receive` | Upstairs: shows the last 16 hours of orders and reads each new one out loud (tap **Turn on sound** once after opening). |
+
+Edit the item buttons in `src/lib/food.ts` (`FOOD_MENU`). Orders are stored in
+the `food_orders` table (migration `drizzle/0002_food_orders.sql`, applied
+automatically on deploy).
+
 ---
 
 ## Tech stack

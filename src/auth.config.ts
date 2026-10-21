@@ -17,10 +17,20 @@ export const authConfig = {
   },
   trustHost: true,
   callbacks: {
-    /** Route guard used by the middleware: everything requires a session. */
+    /** Route guard used by the middleware: everything except /food requires a session. */
     authorized({ auth, request }) {
       const isLoggedIn = Boolean(auth?.user);
       const { pathname } = request.nextUrl;
+
+      // The food call system is deliberately public: anyone with the link
+      // can send or receive orders, no login.
+      if (
+        pathname === "/food" ||
+        pathname.startsWith("/food/") ||
+        pathname.startsWith("/api/food/")
+      ) {
+        return true;
+      }
 
       if (pathname === "/login") {
         if (isLoggedIn) {
