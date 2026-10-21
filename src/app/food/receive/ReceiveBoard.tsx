@@ -33,7 +33,10 @@ function speak(text: string) {
 /** Pop-up for when this tab is behind another one. Silently skipped if not allowed. */
 function notify(registration: ServiceWorkerRegistration | null, order: FoodOrderDto) {
   if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
-  const title = `New order: ${describeOrder(order)}`;
+  const title =
+    order.kind === "message"
+      ? `Message: ${describeOrder(order)}`
+      : `New order: ${describeOrder(order)}`;
   const options = {
     body: order.name ? `For ${order.name}` : "Tap to open the order list",
     tag: `food-order-${order.id}`,
@@ -207,6 +210,7 @@ export default function ReceiveBoard() {
         <ul className="space-y-2">
           {orders.map((order) => {
             const fresh = freshIds.has(order.id);
+            const isMessage = order.kind === "message";
             return (
               <li
                 key={order.id}
@@ -214,11 +218,19 @@ export default function ReceiveBoard() {
                 className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 ${
                   fresh
                     ? "animate-pulse border-orange-500 bg-orange-50"
-                    : "border-slate-200 bg-white"
+                    : isMessage
+                      ? "border-sky-300 bg-sky-50"
+                      : "border-slate-200 bg-white"
                 }`}
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xl font-bold">{describeOrder(order)}</p>
+                  {isMessage ? (
+                    <p className="whitespace-pre-wrap break-words text-xl font-bold">
+                      💬 {describeOrder(order)}
+                    </p>
+                  ) : (
+                    <p className="truncate text-xl font-bold">{describeOrder(order)}</p>
+                  )}
                   <p className="text-sm text-slate-600">
                     {timeLabel(order.createdAt)}
                     {order.name ? ` · for ${order.name}` : ""}

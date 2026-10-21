@@ -50,7 +50,7 @@ A stand-in for the broken kitchen call button. Anyone with the link can use it.
 
 | Page | Who uses it |
 | --- | --- |
-| `/food/send` | Downstairs kitchen: pick an item, how many, optional name, **Send**. |
+| `/food/send` | Downstairs kitchen: pick an item, how many, optional name, **Send** — or switch to **Message** to type a custom note that is read out. |
 | `/food/receive` | Upstairs: shows the last 16 hours of orders and reads each new one out loud (tap **Turn on sound** once after opening). |
 
 The item buttons are the Savory section of the Craves menu; edit them in

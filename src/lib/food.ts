@@ -20,7 +20,9 @@ export type FoodMenuItem = (typeof FOOD_MENU)[number];
 export const FOOD_HISTORY_HOURS = 16;
 
 export const foodOrderSchema = z.object({
-  item: z.string().trim().min(1, "Pick an item").max(60),
+  kind: z.enum(["order", "message"]).default("order"),
+  // Menu items are short; custom messages can be a sentence or two.
+  item: z.string().trim().min(1, "Pick an item or type a message").max(200),
   quantity: z.coerce.number().int().min(1).max(50).default(1),
   name: z
     .string()
@@ -28,6 +30,8 @@ export const foodOrderSchema = z.object({
     .max(40)
     .optional()
     .transform((value) => (value ? value : null)),
+}).refine((order) => order.kind === "message" || order.item.length <= 60, {
+  message: "Item name is too long",
 });
 
 export type FoodOrderInput = z.infer<typeof foodOrderSchema>;
@@ -35,6 +39,7 @@ export type FoodOrderInput = z.infer<typeof foodOrderSchema>;
 /** Shape the API returns; dates as ISO strings so it is JSON-safe. */
 export type FoodOrderDto = {
   id: number;
+  kind: "order" | "message";
   item: string;
   quantity: number;
   name: string | null;
@@ -42,7 +47,8 @@ export type FoodOrderDto = {
 };
 
 /** "2 sausage rolls" / "1 pasty" — what the receiver displays. */
-export function describeOrder(order: Pick<FoodOrderDto, "item" | "quantity">) {
+export function describeOrder(order: Pick<FoodOrderDto, "kind" | "item" | "quantity">) {
+  if (order.kind === "message") return order.item;
   return order.quantity > 1 ? `${order.quantity} × ${order.item}` : order.item;
 }
 
@@ -62,7 +68,10 @@ function pluralWord(word: string) {
 }
 
 /** The sentence read aloud on the receiving screen. */
-export function spokenOrder(order: Pick<FoodOrderDto, "item" | "quantity" | "name">) {
+export function spokenOrder(
+  order: Pick<FoodOrderDto, "kind" | "item" | "quantity" | "name">,
+) {
+  if (order.kind === "message") return `Message from downstairs. ${order.item}`;
   const what =
     order.quantity > 1 ? `${order.quantity} ${plural(order.item)}` : order.item;
   const forWho = order.name ? `, for ${order.name}` : "";
