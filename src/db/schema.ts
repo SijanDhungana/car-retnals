@@ -111,6 +111,8 @@ export const foodOrders = pgTable(
   "food_orders",
   {
     id: serial("id").primaryKey(),
+    /** "order" (menu item) or "message" (free text typed downstairs). */
+    kind: text("kind").notNull().default("order"),
     item: text("item").notNull(),
     quantity: integer("quantity").notNull().default(1),
     name: text("name"),

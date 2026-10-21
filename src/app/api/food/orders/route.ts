@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 function toDto(row: FoodOrder): FoodOrderDto {
   return {
     id: row.id,
+    kind: row.kind === "message" ? "message" : "order",
     item: row.item,
     quantity: row.quantity,
     name: row.name,

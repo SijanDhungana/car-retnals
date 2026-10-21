@@ -22,6 +22,13 @@
       "when": 1792598206722,
       "tag": "0002_food_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792608010014,
+      "tag": "0003_food_message_kind",
+      "breakpoints": true
     }
   ]
 }
