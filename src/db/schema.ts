@@ -4,6 +4,7 @@ import {
   numeric,
   pgEnum,
   pgTable,
+  serial,
   text,
   timestamp,
   uniqueIndex,
@@ -101,6 +102,25 @@ export const bookings = pgTable(
   ],
 );
 
+/**
+ * Food call system: orders sent from the downstairs savoury kitchen to the
+ * counter. Public (no login) — see `src/app/food`. Serial id so the receiving
+ * screen can poll for "everything after the last id I saw".
+ */
+export const foodOrders = pgTable(
+  "food_orders",
+  {
+    id: serial("id").primaryKey(),
+    item: text("item").notNull(),
+    quantity: integer("quantity").notNull().default(1),
+    name: text("name"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("food_orders_created_at_idx").on(table.createdAt)],
+);
+
 export const carsRelations = relations(cars, ({ many }) => ({
   bookings: many(bookings),
 }));
@@ -118,3 +138,4 @@ export type Car = typeof cars.$inferSelect;
 export type Booking = typeof bookings.$inferSelect;
 export type NewBooking = typeof bookings.$inferInsert;
 export type BookingStatus = (typeof bookingStatusEnum.enumValues)[number];
+export type FoodOrder = typeof foodOrders.$inferSelect;

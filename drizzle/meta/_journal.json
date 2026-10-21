@@ -15,6 +15,13 @@
       "when": 1785789488188,
       "tag": "0001_no_double_booking",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792598206722,
+      "tag": "0002_food_orders",
+      "breakpoints": true
     }
   ]
 }
