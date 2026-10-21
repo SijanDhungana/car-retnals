@@ -4,8 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { describeOrder, spokenOrder, type FoodOrderDto } from "@/lib/food";
 
-const POLL_MS = 2000;
-
 /** Short two-note "ding-dong" so people look up before the voice starts. */
 function chime(context: AudioContext | null) {
   if (!context) return;
@@ -32,6 +30,26 @@ function speak(text: string) {
   window.speechSynthesis.speak(utterance);
 }
 
+/** Pop-up for when this tab is behind another one. Silently skipped if not allowed. */
+function notify(registration: ServiceWorkerRegistration | null, order: FoodOrderDto) {
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+  const title = `New order: ${describeOrder(order)}`;
+  const options = {
+    body: order.name ? `For ${order.name}` : "Tap to open the order list",
+    tag: `food-order-${order.id}`,
+    requireInteraction: true,
+  };
+  if (registration) {
+    registration.showNotification(title, options).catch(() => {});
+  } else {
+    try {
+      new Notification(title, options);
+    } catch {
+      // Some phones only allow notifications through a service worker.
+    }
+  }
+}
+
 function timeLabel(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
@@ -43,7 +61,7 @@ export default function ReceiveBoard() {
   const [offline, setOffline] = useState(false);
   const [freshIds, setFreshIds] = useState<Set<number>>(new Set());
 
-  const lastIdRef = useRef(0);
+  const swRef = useRef<ServiceWorkerRegistration | null>(null);
   const soundOnRef = useRef(false);
   const audioRef = useRef<AudioContext | null>(null);
 
@@ -51,49 +69,50 @@ export default function ReceiveBoard() {
     if (!soundOnRef.current) return;
     chime(audioRef.current);
     setTimeout(() => speak(spokenOrder(order)), 800);
+    if (document.hidden) notify(swRef.current, order);
   }, []);
 
-  // Load everything from today first, then poll for anything newer.
+  // Load everything from today first, then keep polling for anything newer.
+  // Polling runs in a worker so it keeps going while another tab is in front.
   useEffect(() => {
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout>;
     let firstLoadDone = false;
+    const worker = new Worker("/food/poll-worker.js");
 
-    async function poll() {
-      try {
-        const query = lastIdRef.current ? `?after=${lastIdRef.current}` : "";
-        const response = await fetch(`/api/food/orders${query}`, { cache: "no-store" });
-        if (!response.ok) throw new Error(String(response.status));
-        const { orders: incoming } = (await response.json()) as { orders: FoodOrderDto[] };
-        if (cancelled) return;
-        setOffline(false);
-
-        const isFirstLoad = !firstLoadDone;
-        firstLoadDone = true;
-        setLoaded(true);
-
-        if (incoming.length) {
-          lastIdRef.current = incoming[incoming.length - 1].id;
-          setOrders((previous) => [...incoming.slice().reverse(), ...previous]);
-          // Orders already there when the page opened are shown, not read out.
-          if (!isFirstLoad) {
-            setFreshIds((previous) => new Set([...previous, ...incoming.map((o) => o.id)]));
-            incoming.forEach(announce);
-          }
-        }
-      } catch {
-        if (!cancelled) setOffline(true);
-      } finally {
-        if (!cancelled) timer = setTimeout(poll, POLL_MS);
+    worker.onmessage = (event: MessageEvent<{ ok: boolean; orders?: FoodOrderDto[] }>) => {
+      if (!event.data.ok) {
+        setOffline(true);
+        return;
       }
-    }
+      setOffline(false);
+      const incoming = event.data.orders ?? [];
+      const isFirstLoad = !firstLoadDone;
+      firstLoadDone = true;
+      setLoaded(true);
 
-    poll();
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
+      if (incoming.length) {
+        setOrders((previous) => [...incoming.slice().reverse(), ...previous]);
+        // Orders already there when the page opened are shown, not read out.
+        if (!isFirstLoad) {
+          setFreshIds((previous) => new Set([...previous, ...incoming.map((o) => o.id)]));
+          incoming.forEach(announce);
+        }
+      }
     };
+    worker.postMessage("start");
+    return () => worker.terminate();
   }, [announce]);
+
+  // While this tab is in the background, show the unseen count in its title.
+  useEffect(() => {
+    const unseen = freshIds.size;
+    document.title =
+      unseen && document.hidden ? `🔔 (${unseen}) New order` : "Food Call — Receive";
+    const onVisible = () => {
+      if (!document.hidden) document.title = "Food Call — Receive";
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [freshIds]);
 
   // Keep the screen awake while sound is on (where the browser allows it).
   useEffect(() => {
@@ -125,6 +144,17 @@ export default function ReceiveBoard() {
     speak("Sound is on. New orders will be read out.");
     soundOnRef.current = true;
     setSoundOn(true);
+
+    // Ask once for pop-up notifications, used when another tab is in front.
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .register("/food/sw.js", { scope: "/food/" })
+        .then((registration) => (swRef.current = registration))
+        .catch(() => {});
+    }
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
   }
 
   function markSeen(id: number) {
@@ -157,7 +187,7 @@ export default function ReceiveBoard() {
         </button>
       ) : (
         <p className="mb-4 rounded-xl bg-green-50 px-4 py-3 text-center font-medium text-green-800">
-          🔊 Sound on — keep this page open. Tap a flashing order to clear it.
+          🔊 Sound on — keep this tab open (it can be behind other tabs). Tap a flashing order to clear it.
         </p>
       )}
 
