@@ -4,7 +4,7 @@ import { FOOD_LOCATIONS } from "@/lib/food";
 
 export const metadata: Metadata = {
   title: "Food Call",
-  description: "Send savoury orders from the kitchen and hear them upstairs.",
+  description: "Send savoury orders from the kitchen and hear them at the counter.",
 };
 
 export default function FoodHome() {

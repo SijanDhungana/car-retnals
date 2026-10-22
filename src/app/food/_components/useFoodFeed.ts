@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   describeOrder,
+  sidesFor,
   spokenOrder,
   type FoodLocation,
   type FoodOrderDto,
+  type FoodSides,
   type FoodTarget,
 } from "@/lib/food";
+import { speak } from "./voice";
 
 /** Short two-note "ding-dong" so people look up before the voice starts. */
 function chime(context: AudioContext | null) {
@@ -27,22 +30,18 @@ function chime(context: AudioContext | null) {
   });
 }
 
-export function speak(text: string) {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = 0.95;
-  utterance.volume = 1;
-  window.speechSynthesis.speak(utterance);
-}
-
 /** Pop-up for when this tab is behind another one. Silently skipped if not allowed. */
-function notify(registration: ServiceWorkerRegistration | null, order: FoodOrderDto) {
+function notify(
+  registration: ServiceWorkerRegistration | null,
+  order: FoodOrderDto,
+  sides: FoodSides,
+) {
   if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
   const title =
     order.kind === "message"
       ? `Message: ${describeOrder(order)}`
       : order.kind === "request"
-        ? `Upstairs needs: ${describeOrder(order)}`
+        ? `${sides.counter.label} needs: ${describeOrder(order)}`
         : `New order: ${describeOrder(order)}`;
   const options = {
     body: order.name ? `For ${order.name}` : "Tap to open",
@@ -84,12 +83,16 @@ export function useFoodFeed({
   const audioRef = useRef<AudioContext | null>(null);
   const swRef = useRef<ServiceWorkerRegistration | null>(null);
 
-  const announce = useCallback((order: FoodOrderDto) => {
-    if (!soundOnRef.current) return;
-    chime(audioRef.current);
-    setTimeout(() => speak(spokenOrder(order)), 800);
-    if (document.hidden) notify(swRef.current, order);
-  }, []);
+  const announce = useCallback(
+    (order: FoodOrderDto) => {
+      if (!soundOnRef.current) return;
+      const sides = sidesFor(location);
+      chime(audioRef.current);
+      setTimeout(() => speak(spokenOrder(order, sides)), 800);
+      if (document.hidden) notify(swRef.current, order, sides);
+    },
+    [location],
+  );
 
   useEffect(() => {
     let firstLoadDone = false;
