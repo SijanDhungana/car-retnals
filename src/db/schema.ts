@@ -112,7 +112,7 @@ export const foodOrders = pgTable(
   {
     id: serial("id").primaryKey(),
     /** Which shop: "pickering" or "scarborough". */
-    location: text("location").notNull().default("pickering"),
+    location: text("location").notNull(),
     /** Who it is for: "upstairs" (kitchen → counter) or "downstairs" (counter → kitchen). */
     target: text("target").notNull().default("upstairs"),
     /** "order" (menu item), "request" (saved button from upstairs) or "message" (free text). */

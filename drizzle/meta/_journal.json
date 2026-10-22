@@ -36,6 +36,13 @@
       "when": 1792670915348,
       "tag": "0004_food_locations_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792673411061,
+      "tag": "0005_food_no_default_location",
+      "breakpoints": true
     }
   ]
 }
