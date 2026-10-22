@@ -1,15 +1,21 @@
 import { NextResponse } from "next/server";
-import { and, asc, gt, gte } from "drizzle-orm";
+import { and, asc, eq, gt, gte } from "drizzle-orm";
 import { db } from "@/db";
 import { foodOrders, type FoodOrder } from "@/db/schema";
-import { FOOD_HISTORY_HOURS, foodOrderSchema, type FoodOrderDto } from "@/lib/food";
+import {
+  FOOD_HISTORY_HOURS,
+  foodOrderSchema,
+  isFoodLocation,
+  type FoodOrderDto,
+} from "@/lib/food";
 
 export const dynamic = "force-dynamic";
 
 function toDto(row: FoodOrder): FoodOrderDto {
   return {
     id: row.id,
-    kind: row.kind === "message" ? "message" : "order",
+    target: row.target === "downstairs" ? "downstairs" : "upstairs",
+    kind: row.kind === "message" || row.kind === "request" ? row.kind : "order",
     item: row.item,
     quantity: row.quantity,
     name: row.name,
@@ -18,12 +24,17 @@ function toDto(row: FoodOrder): FoodOrderDto {
 }
 
 /**
- * GET /api/food/orders            → recent orders (oldest first)
- * GET /api/food/orders?after=123  → only orders newer than id 123 (polling)
+ * GET /api/food/orders?location=pickering&target=upstairs            → recent (oldest first)
+ * GET /api/food/orders?location=pickering&target=upstairs&after=123  → newer than id 123
  */
 export async function GET(request: Request) {
-  const afterParam = new URL(request.url).searchParams.get("after");
-  const after = afterParam ? Number(afterParam) : 0;
+  const params = new URL(request.url).searchParams;
+  const location = params.get("location");
+  const target = params.get("target") === "downstairs" ? "downstairs" : "upstairs";
+  if (!isFoodLocation(location)) {
+    return NextResponse.json({ error: "Unknown location" }, { status: 400 });
+  }
+  const after = Number(params.get("after") ?? 0);
   const since = new Date(Date.now() - FOOD_HISTORY_HOURS * 60 * 60 * 1000);
 
   const rows = await db
@@ -31,6 +42,8 @@ export async function GET(request: Request) {
     .from(foodOrders)
     .where(
       and(
+        eq(foodOrders.location, location),
+        eq(foodOrders.target, target),
         gte(foodOrders.createdAt, since),
         Number.isInteger(after) && after > 0 ? gt(foodOrders.id, after) : undefined,
       ),
@@ -44,7 +57,7 @@ export async function GET(request: Request) {
   );
 }
 
-/** POST /api/food/orders  { item, quantity?, name? } */
+/** POST /api/food/orders  { location, target, kind, item, quantity?, name? } */
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const parsed = foodOrderSchema.safeParse(body);

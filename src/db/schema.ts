@@ -111,7 +111,11 @@ export const foodOrders = pgTable(
   "food_orders",
   {
     id: serial("id").primaryKey(),
-    /** "order" (menu item) or "message" (free text typed downstairs). */
+    /** Which shop: "pickering" or "scarborough". */
+    location: text("location").notNull().default("pickering"),
+    /** Who it is for: "upstairs" (kitchen → counter) or "downstairs" (counter → kitchen). */
+    target: text("target").notNull().default("upstairs"),
+    /** "order" (menu item), "request" (saved button from upstairs) or "message" (free text). */
     kind: text("kind").notNull().default("order"),
     item: text("item").notNull(),
     quantity: integer("quantity").notNull().default(1),
@@ -120,7 +124,27 @@ export const foodOrders = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [index("food_orders_created_at_idx").on(table.createdAt)],
+  (table) => [
+    index("food_orders_created_at_idx").on(table.createdAt),
+    index("food_orders_feed_idx").on(table.location, table.target, table.id),
+  ],
+);
+
+/**
+ * Buttons upstairs saves for things it asks the kitchen for often ("Milk"),
+ * so nobody has to retype them. Kept until someone removes them.
+ */
+export const foodRequestButtons = pgTable(
+  "food_request_buttons",
+  {
+    id: serial("id").primaryKey(),
+    location: text("location").notNull(),
+    label: text("label").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("food_request_buttons_location_idx").on(table.location)],
 );
 
 export const carsRelations = relations(cars, ({ many }) => ({
@@ -141,3 +165,4 @@ export type Booking = typeof bookings.$inferSelect;
 export type NewBooking = typeof bookings.$inferInsert;
 export type BookingStatus = (typeof bookingStatusEnum.enumValues)[number];
 export type FoodOrder = typeof foodOrders.$inferSelect;
+export type FoodRequestButton = typeof foodRequestButtons.$inferSelect;

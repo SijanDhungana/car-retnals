@@ -1,8 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { describeOrder, spokenOrder, type FoodOrderDto } from "@/lib/food";
+import {
+  describeOrder,
+  spokenOrder,
+  type FoodLocation,
+  type FoodOrderDto,
+  type FoodTarget,
+} from "@/lib/food";
 
 /** Short two-note "ding-dong" so people look up before the voice starts. */
 function chime(context: AudioContext | null) {
@@ -22,7 +27,7 @@ function chime(context: AudioContext | null) {
   });
 }
 
-function speak(text: string) {
+export function speak(text: string) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.rate = 0.95;
@@ -36,9 +41,11 @@ function notify(registration: ServiceWorkerRegistration | null, order: FoodOrder
   const title =
     order.kind === "message"
       ? `Message: ${describeOrder(order)}`
-      : `New order: ${describeOrder(order)}`;
+      : order.kind === "request"
+        ? `Upstairs needs: ${describeOrder(order)}`
+        : `New order: ${describeOrder(order)}`;
   const options = {
-    body: order.name ? `For ${order.name}` : "Tap to open the order list",
+    body: order.name ? `For ${order.name}` : "Tap to open",
     tag: `food-order-${order.id}`,
     requireInteraction: true,
   };
@@ -53,20 +60,29 @@ function notify(registration: ServiceWorkerRegistration | null, order: FoodOrder
   }
 }
 
-function timeLabel(iso: string) {
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
-export default function ReceiveBoard() {
+/**
+ * Everything a screen needs to listen for orders/requests sent to it:
+ * loads the last few hours, then polls (in a worker, so it keeps going in a
+ * background tab), chimes, reads each new one aloud and flags it as fresh.
+ */
+export function useFoodFeed({
+  location,
+  target,
+  pageTitle,
+}: {
+  location: FoodLocation;
+  target: FoodTarget;
+  pageTitle: string;
+}) {
   const [orders, setOrders] = useState<FoodOrderDto[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [soundOn, setSoundOn] = useState(false);
   const [offline, setOffline] = useState(false);
   const [freshIds, setFreshIds] = useState<Set<number>>(new Set());
 
-  const swRef = useRef<ServiceWorkerRegistration | null>(null);
   const soundOnRef = useRef(false);
   const audioRef = useRef<AudioContext | null>(null);
+  const swRef = useRef<ServiceWorkerRegistration | null>(null);
 
   const announce = useCallback((order: FoodOrderDto) => {
     if (!soundOnRef.current) return;
@@ -75,12 +91,9 @@ export default function ReceiveBoard() {
     if (document.hidden) notify(swRef.current, order);
   }, []);
 
-  // Load everything from today first, then keep polling for anything newer.
-  // Polling runs in a worker so it keeps going while another tab is in front.
   useEffect(() => {
     let firstLoadDone = false;
     const worker = new Worker("/food/poll-worker.js");
-
     worker.onmessage = (event: MessageEvent<{ ok: boolean; orders?: FoodOrderDto[] }>) => {
       if (!event.data.ok) {
         setOffline(true);
@@ -91,31 +104,29 @@ export default function ReceiveBoard() {
       const isFirstLoad = !firstLoadDone;
       firstLoadDone = true;
       setLoaded(true);
+      if (!incoming.length) return;
 
-      if (incoming.length) {
-        setOrders((previous) => [...incoming.slice().reverse(), ...previous]);
-        // Orders already there when the page opened are shown, not read out.
-        if (!isFirstLoad) {
-          setFreshIds((previous) => new Set([...previous, ...incoming.map((o) => o.id)]));
-          incoming.forEach(announce);
-        }
+      setOrders((previous) => [...incoming.slice().reverse(), ...previous]);
+      // What was already there when the page opened is shown, not read out.
+      if (!isFirstLoad) {
+        setFreshIds((previous) => new Set([...previous, ...incoming.map((o) => o.id)]));
+        incoming.forEach(announce);
       }
     };
-    worker.postMessage("start");
+    worker.postMessage({ feed: `/api/food/orders?location=${location}&target=${target}` });
     return () => worker.terminate();
-  }, [announce]);
+  }, [announce, location, target]);
 
   // While this tab is in the background, show the unseen count in its title.
   useEffect(() => {
     const unseen = freshIds.size;
-    document.title =
-      unseen && document.hidden ? `🔔 (${unseen}) New order` : "Food Call — Receive";
+    document.title = unseen && document.hidden ? `🔔 (${unseen}) ${pageTitle}` : pageTitle;
     const onVisible = () => {
-      if (!document.hidden) document.title = "Food Call — Receive";
+      if (!document.hidden) document.title = pageTitle;
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [freshIds]);
+  }, [freshIds, pageTitle]);
 
   // Keep the screen awake while sound is on (where the browser allows it).
   useEffect(() => {
@@ -144,7 +155,7 @@ export default function ReceiveBoard() {
       audioRef.current = null;
     }
     chime(audioRef.current);
-    speak("Sound is on. New orders will be read out.");
+    speak("Sound is on.");
     soundOnRef.current = true;
     setSoundOn(true);
 
@@ -168,90 +179,18 @@ export default function ReceiveBoard() {
     });
   }
 
-  return (
-    <main className="mx-auto max-w-2xl px-4 pb-10 pt-6">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Incoming orders</h1>
-        <Link href="/food" className="text-sm text-slate-500 underline">
-          Switch
-        </Link>
-      </div>
+  return { orders, loaded, offline, soundOn, turnSoundOn, freshIds, markSeen };
+}
 
-      {!soundOn ? (
-        <button
-          type="button"
-          onClick={turnSoundOn}
-          className="mb-4 w-full rounded-2xl bg-orange-500 px-4 py-6 text-xl font-bold text-white shadow"
-        >
-          🔊 Tap to turn on sound
-          <span className="mt-1 block text-sm font-normal opacity-90">
-            Needed once each time this page opens
-          </span>
-        </button>
-      ) : (
-        <p className="mb-4 rounded-xl bg-green-50 px-4 py-3 text-center font-medium text-green-800">
-          🔊 Sound on — keep this tab open (it can be behind other tabs). Tap a flashing order to clear it.
-        </p>
-      )}
-
-      {offline && (
-        <p className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-center font-medium text-red-700">
-          Can&apos;t reach the server — retrying…
-        </p>
-      )}
-
-      {!loaded ? (
-        <p className="py-10 text-center text-slate-500">Loading orders…</p>
-      ) : orders.length === 0 ? (
-        <p className="py-10 text-center text-slate-500">
-          No orders yet. New ones will appear here and be read out.
-        </p>
-      ) : (
-        <ul className="space-y-2">
-          {orders.map((order) => {
-            const fresh = freshIds.has(order.id);
-            const isMessage = order.kind === "message";
-            return (
-              <li
-                key={order.id}
-                onClick={() => fresh && markSeen(order.id)}
-                className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 ${
-                  fresh
-                    ? "animate-pulse border-orange-500 bg-orange-50"
-                    : isMessage
-                      ? "border-sky-300 bg-sky-50"
-                      : "border-slate-200 bg-white"
-                }`}
-              >
-                <div className="min-w-0 flex-1">
-                  {isMessage ? (
-                    <p className="whitespace-pre-wrap break-words text-xl font-bold">
-                      💬 {describeOrder(order)}
-                    </p>
-                  ) : (
-                    <p className="truncate text-xl font-bold">{describeOrder(order)}</p>
-                  )}
-                  <p className="text-sm text-slate-600">
-                    {timeLabel(order.createdAt)}
-                    {order.name ? ` · for ${order.name}` : ""}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  aria-label={`Read ${order.item} out again`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    speak(spokenOrder(order));
-                  }}
-                  className="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium"
-                >
-                  Repeat
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </main>
-  );
+/** Sends an order / request / message. Throws with a readable message on failure. */
+export async function postFoodOrder(body: Record<string, unknown>) {
+  const response = await fetch("/api/food/orders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error ?? "Couldn't send");
+  }
 }
