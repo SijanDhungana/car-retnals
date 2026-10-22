@@ -142,7 +142,10 @@ export function spokenOrder(
 ) {
   const from = order.target === "upstairs" ? sides.kitchen.spoken : sides.counter.spoken;
   if (order.kind === "message") return `Message from ${from}. ${order.item}`;
-  if (order.kind === "request") return `${capitalise(sides.counter.spoken)} needs ${order.item}.`;
+  if (order.kind === "request") {
+    const amount = order.quantity > 1 ? `${order.quantity} ` : "";
+    return `${capitalise(sides.counter.spoken)} needs ${amount}${order.item}.`;
+  }
   const what =
     order.quantity > 1 ? `${order.quantity} ${plural(order.item)}` : order.item;
   const forWho = order.name ? `, for ${order.name}` : "";
