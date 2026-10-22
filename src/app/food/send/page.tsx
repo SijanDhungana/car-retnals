@@ -1,9 +1,6 @@
-import type { Metadata } from "next";
-import { FOOD_MENU } from "@/lib/food";
-import SendForm from "./SendForm";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Food Call — Send" };
-
-export default function SendPage() {
-  return <SendForm menu={FOOD_MENU} />;
+/** Old link from before locations existed — send people to the location picker. */
+export default function OldLink() {
+  redirect("/food");
 }

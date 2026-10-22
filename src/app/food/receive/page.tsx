@@ -1,8 +1,6 @@
-import type { Metadata } from "next";
-import ReceiveBoard from "./ReceiveBoard";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Food Call — Receive" };
-
-export default function ReceivePage() {
-  return <ReceiveBoard />;
+/** Old link from before locations existed — send people to the location picker. */
+export default function OldLink() {
+  redirect("/food");
 }

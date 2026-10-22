@@ -1,10 +1,21 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
-import type { FoodMenuItem } from "@/lib/food";
+import { FOOD_MENU, type FoodLocation } from "@/lib/food";
+import { FeedList, MessageBox, ScreenHeader, SoundBanner } from "../../_components/FeedParts";
+import { postFoodOrder, useFoodFeed } from "../../_components/useFoodFeed";
 
-export default function SendForm({ menu }: { menu: FoodMenuItem[] }) {
+const menu = FOOD_MENU;
+
+/** Downstairs kitchen: sends orders/messages up, hears requests from upstairs. */
+export default function DownstairsScreen({
+  location,
+  locationName,
+}: {
+  location: FoodLocation;
+  locationName: string;
+}) {
+  const feed = useFoodFeed({ location, target: "downstairs", pageTitle: "Downstairs — Food Call" });
   const [mode, setMode] = useState<"order" | "message">("order");
   const [customText, setCustomText] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
@@ -30,17 +41,11 @@ export default function SendForm({ menu }: { menu: FoodMenuItem[] }) {
     setSending(true);
     setMessage(null);
     try {
-      const response = await fetch("/api/food/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          mode === "message" ? { kind: "message", item } : { kind: "order", item, quantity, name },
-        ),
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? "Couldn't send");
-      }
+      await postFoodOrder(
+        mode === "message"
+          ? { location, target: "upstairs", kind: "message", item }
+          : { location, target: "upstairs", kind: "order", item, quantity, name },
+      );
       if (mode === "message") {
         setMessage({ kind: "ok", text: "Message sent" });
         setCustomText("");
@@ -66,15 +71,26 @@ export default function SendForm({ menu }: { menu: FoodMenuItem[] }) {
 
   return (
     <main className="mx-auto max-w-xl px-4 pb-40 pt-6">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">
-          {mode === "order" ? "Send an order" : "Send a message"}
-        </h1>
-        <Link href="/food" className="text-sm text-slate-500 underline">
-          Switch
-        </Link>
-      </div>
+      <ScreenHeader title="Downstairs" locationName={locationName} locationSlug={location} />
+      <SoundBanner soundOn={feed.soundOn} onTurnOn={feed.turnSoundOn} offline={feed.offline} />
 
+      <section className="mb-6">
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+          From upstairs
+        </h2>
+        <FeedList
+          orders={feed.orders}
+          loaded={feed.loaded}
+          freshIds={feed.freshIds}
+          onSeen={feed.markSeen}
+          emptyText="Nothing from upstairs yet."
+          limit={5}
+        />
+      </section>
+
+      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+        Send upstairs
+      </h2>
       <div className="mb-5 grid grid-cols-2 rounded-xl bg-slate-200 p-1" role="tablist">
         {(["order", "message"] as const).map((value) => (
           <button
@@ -96,20 +112,11 @@ export default function SendForm({ menu }: { menu: FoodMenuItem[] }) {
       </div>
 
       {mode === "message" ? (
-        <div>
-          <label htmlFor="custom" className="field-label">
-            Message (read out loud upstairs)
-          </label>
-          <textarea
-            id="custom"
-            rows={4}
-            maxLength={200}
-            className="field-input text-lg"
-            value={customText}
-            onChange={(event) => setCustomText(event.target.value)}
-          />
-          <p className="mt-1 text-right text-sm text-slate-500">{customText.length}/200</p>
-        </div>
+        <MessageBox
+          value={customText}
+          onChange={setCustomText}
+          label="Message (read out loud upstairs)"
+        />
       ) : (
         <>
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Item</h2>
