@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { FOOD_MENU, type FoodLocation } from "@/lib/food";
+import { FOOD_MENU, sidesFor, type FoodLocation } from "@/lib/food";
 import { FeedList, MessageBox, ScreenHeader, SoundBanner } from "../../_components/FeedParts";
 import { postFoodOrder, useFoodFeed } from "../../_components/useFoodFeed";
 
 const menu = FOOD_MENU;
 
-/** Downstairs kitchen: sends orders/messages up, hears requests from upstairs. */
+/** Kitchen end (Back room / Downstairs): sends orders and messages, hears requests. */
 export default function DownstairsScreen({
   location,
   locationName,
@@ -15,7 +15,12 @@ export default function DownstairsScreen({
   location: FoodLocation;
   locationName: string;
 }) {
-  const feed = useFoodFeed({ location, target: "downstairs", pageTitle: "Downstairs — Food Call" });
+  const sides = sidesFor(location);
+  const feed = useFoodFeed({
+    location,
+    target: "downstairs",
+    pageTitle: `${sides.kitchen.label} — Food Call`,
+  });
   const [mode, setMode] = useState<"order" | "message">("order");
   const [customText, setCustomText] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
@@ -71,25 +76,26 @@ export default function DownstairsScreen({
 
   return (
     <main className="mx-auto max-w-xl px-4 pb-40 pt-6">
-      <ScreenHeader title="Downstairs" locationName={locationName} locationSlug={location} />
+      <ScreenHeader title={sides.kitchen.label} locationName={locationName} locationSlug={location} />
       <SoundBanner soundOn={feed.soundOn} onTurnOn={feed.turnSoundOn} offline={feed.offline} />
 
       <section className="mb-6">
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-          From upstairs
+          From {sides.counter.spoken}
         </h2>
         <FeedList
           orders={feed.orders}
           loaded={feed.loaded}
           freshIds={feed.freshIds}
           onSeen={feed.markSeen}
-          emptyText="Nothing from upstairs yet."
+          sides={sides}
+          emptyText={`Nothing from ${sides.counter.spoken} yet.`}
           limit={5}
         />
       </section>
 
       <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Send upstairs
+        Send to {sides.counter.label.toLowerCase()}
       </h2>
       <div className="mb-5 grid grid-cols-2 rounded-xl bg-slate-200 p-1" role="tablist">
         {(["order", "message"] as const).map((value) => (
@@ -115,7 +121,7 @@ export default function DownstairsScreen({
         <MessageBox
           value={customText}
           onChange={setCustomText}
-          label="Message (read out loud upstairs)"
+          label="Message (it gets read out loud)"
         />
       ) : (
         <>

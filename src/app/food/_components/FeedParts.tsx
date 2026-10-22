@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { describeOrder, spokenOrder, type FoodOrderDto } from "@/lib/food";
-import { speak } from "./useFoodFeed";
+import { useEffect, useState } from "react";
+import { describeOrder, spokenOrder, type FoodOrderDto, type FoodSides } from "@/lib/food";
+import { saveVoiceUri, savedVoiceUri, speak, watchVoices } from "./voice";
 
 export function ScreenHeader({
   title,
@@ -51,9 +52,12 @@ export function SoundBanner({
           </span>
         </button>
       ) : (
-        <p className="mb-4 rounded-xl bg-green-50 px-4 py-3 text-center font-medium text-green-800">
-          🔊 Sound on — keep this page open. Tap a flashing one to clear it.
-        </p>
+        <div className="mb-4 rounded-xl bg-green-50 px-4 py-3 text-green-800">
+          <p className="text-center font-medium">
+            🔊 Sound on — keep this page open. Tap a flashing one to clear it.
+          </p>
+          <VoicePicker />
+        </div>
       )}
       {offline && (
         <p className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-center font-medium text-red-700">
@@ -68,6 +72,63 @@ function timeLabel(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+/** Lets each device pick its voice; defaults to the best-sounding one it has. */
+function VoicePicker() {
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selected, setSelected] = useState("");
+
+  useEffect(() => {
+    setSelected(savedVoiceUri());
+    return watchVoices(setVoices);
+  }, []);
+
+  if (voices.length === 0) return null;
+  const hasHighQuality = voices.some((voice) => /premium|enhanced|natural|neural|google/i.test(voice.name));
+
+  return (
+    <div className="mt-3">
+      <div className="flex items-end gap-2">
+        <div className="min-w-0 flex-1">
+          <label htmlFor="voice" className="mb-1 block text-sm font-medium text-green-900">
+            Voice
+          </label>
+          <select
+            id="voice"
+            className="field-input"
+            value={selected}
+            onChange={(event) => {
+              setSelected(event.target.value);
+              saveVoiceUri(event.target.value);
+              speak("This is how new orders will sound.");
+            }}
+          >
+            <option value="">Best available ({voices[0].name})</option>
+            {voices.map((voice) => (
+              <option key={voice.voiceURI} value={voice.voiceURI}>
+                {voice.name} ({voice.lang})
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          type="button"
+          onClick={() => speak("New order. 2 turkey melts, for Sam.")}
+          className="shrink-0 rounded-lg border border-green-300 bg-white px-3 py-2 text-sm font-semibold"
+        >
+          Test voice
+        </button>
+      </div>
+      {!hasHighQuality && (
+        <p className="mt-2 text-sm text-green-900">
+          For a more natural voice on iPad/iPhone: Settings → Accessibility → Spoken Content →
+          Voices → English, download an “Enhanced” or “Premium” voice (e.g. Ava), then reload
+          this page.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function FeedList({
   orders,
   loaded,
@@ -75,7 +136,9 @@ export function FeedList({
   onSeen,
   emptyText,
   limit,
+  sides,
 }: {
+  sides: FoodSides;
   orders: FoodOrderDto[];
   loaded: boolean;
   freshIds: Set<number>;
@@ -118,7 +181,7 @@ export function FeedList({
               aria-label={`Read ${order.item} out again`}
               onClick={(event) => {
                 event.stopPropagation();
-                speak(spokenOrder(order));
+                speak(spokenOrder(order, sides));
               }}
               className="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium"
             >

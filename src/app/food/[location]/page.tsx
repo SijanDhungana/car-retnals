@@ -23,16 +23,16 @@ export default async function LocationHome({
         href={`/food/${location.slug}/send`}
         className="rounded-2xl bg-orange-500 px-6 py-8 text-center text-2xl font-bold text-white shadow active:scale-[0.98]"
       >
-        Downstairs
+        {location.sides.kitchen.label}
         <span className="mt-1 block text-base font-normal opacity-90">
-          Kitchen — send orders up
+          Kitchen — send orders, hear requests
         </span>
       </Link>
       <Link
         href={`/food/${location.slug}/receive`}
         className="rounded-2xl bg-slate-900 px-6 py-8 text-center text-2xl font-bold text-white shadow active:scale-[0.98]"
       >
-        Upstairs
+        {location.sides.counter.label}
         <span className="mt-1 block text-base font-normal opacity-90">
           Hear orders, ask for things
         </span>

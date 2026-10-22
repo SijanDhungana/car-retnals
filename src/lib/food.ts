@@ -1,10 +1,34 @@
 import { z } from "zod";
 
+/**
+ * What each shop calls its two ends. `kitchen` makes the food and sends orders;
+ * `counter` hears them and can ask the kitchen for things.
+ * `spoken` is how the name sounds mid-sentence when read aloud.
+ */
+export type FoodSides = {
+  kitchen: { label: string; spoken: string };
+  counter: { label: string; spoken: string };
+};
+
 /** The two shops. The slug is used in links: /food/pickering/... */
 export const FOOD_LOCATIONS = [
-  { slug: "pickering", name: "Pickering" },
-  { slug: "scarborough", name: "Scarborough" },
-] as const;
+  {
+    slug: "pickering",
+    name: "Pickering",
+    sides: {
+      kitchen: { label: "Back room", spoken: "the back room" },
+      counter: { label: "Front", spoken: "the front" },
+    },
+  },
+  {
+    slug: "scarborough",
+    name: "Scarborough",
+    sides: {
+      kitchen: { label: "Downstairs", spoken: "downstairs" },
+      counter: { label: "Upstairs", spoken: "upstairs" },
+    },
+  },
+] as const satisfies readonly { slug: string; name: string; sides: FoodSides }[];
 
 export type FoodLocation = (typeof FOOD_LOCATIONS)[number]["slug"];
 
@@ -12,12 +36,23 @@ export function findLocation(slug: string) {
   return FOOD_LOCATIONS.find((location) => location.slug === slug) ?? null;
 }
 
+export function sidesFor(slug: FoodLocation): FoodSides {
+  return findLocation(slug)!.sides;
+}
+
+function capitalise(text: string) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 const locationSlugs = FOOD_LOCATIONS.map((location) => location.slug) as [
   FoodLocation,
   ...FoodLocation[],
 ];
 
-/** "upstairs" = kitchen → counter. "downstairs" = counter → kitchen. */
+/**
+ * Which end a message is for. Stored values kept from the first version:
+ * "upstairs" = to the counter (front), "downstairs" = to the kitchen (back room).
+ */
 export type FoodTarget = "upstairs" | "downstairs";
 
 /**
@@ -103,10 +138,11 @@ function pluralWord(word: string) {
 /** The sentence read aloud. */
 export function spokenOrder(
   order: Pick<FoodOrderDto, "target" | "kind" | "item" | "quantity" | "name">,
+  sides: FoodSides,
 ) {
-  const from = order.target === "upstairs" ? "downstairs" : "upstairs";
+  const from = order.target === "upstairs" ? sides.kitchen.spoken : sides.counter.spoken;
   if (order.kind === "message") return `Message from ${from}. ${order.item}`;
-  if (order.kind === "request") return `Upstairs needs ${order.item}.`;
+  if (order.kind === "request") return `${capitalise(sides.counter.spoken)} needs ${order.item}.`;
   const what =
     order.quantity > 1 ? `${order.quantity} ${plural(order.item)}` : order.item;
   const forWho = order.name ? `, for ${order.name}` : "";

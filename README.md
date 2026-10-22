@@ -50,8 +50,8 @@ A stand-in for the broken kitchen call button. Anyone with the link can use it.
 
 | Page | Who uses it |
 | --- | --- |
-| `/food/<location>/send` | Downstairs kitchen (Pickering or Scarborough): send menu orders or a typed message up; hears requests from upstairs. |
-| `/food/<location>/receive` | Upstairs: hears orders (tap **Turn on sound** once after opening); saved request buttons (e.g. “Milk”) and typed messages go downstairs. |
+| `/food/<location>/send` | Kitchen end — "Back room" in Pickering, "Downstairs" in Scarborough: send menu orders or a typed message up; hears requests from upstairs. |
+| `/food/<location>/receive` | Counter end — "Front" in Pickering, "Upstairs" in Scarborough: hears orders (tap **Turn on sound** once after opening); saved request buttons (e.g. “Milk”) and typed messages go downstairs. |
 
 The item buttons are the Savory section of the Craves menu; edit them in
 `src/lib/food.ts` (`FOOD_MENU`). Orders are stored in

@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { FoodButtonDto, FoodLocation } from "@/lib/food";
+import { sidesFor, type FoodButtonDto, type FoodLocation } from "@/lib/food";
 import { FeedList, MessageBox, ScreenHeader, SoundBanner } from "../../_components/FeedParts";
 import { postFoodOrder, useFoodFeed } from "../../_components/useFoodFeed";
 
 type Status = { kind: "ok" | "error"; text: string } | null;
 
-/** Upstairs counter: hears orders from the kitchen, asks the kitchen for things. */
+/** Counter end (Front / Upstairs): hears orders, asks the kitchen for things. */
 export default function UpstairsScreen({
   location,
   locationName,
@@ -15,7 +15,12 @@ export default function UpstairsScreen({
   location: FoodLocation;
   locationName: string;
 }) {
-  const feed = useFoodFeed({ location, target: "upstairs", pageTitle: "Upstairs — Food Call" });
+  const sides = sidesFor(location);
+  const feed = useFoodFeed({
+    location,
+    target: "upstairs",
+    pageTitle: `${sides.counter.label} — Food Call`,
+  });
 
   const [buttons, setButtons] = useState<FoodButtonDto[]>([]);
   const [buttonsLoaded, setButtonsLoaded] = useState(false);
@@ -89,12 +94,12 @@ export default function UpstairsScreen({
 
   return (
     <main className="mx-auto max-w-2xl px-4 pb-10 pt-6">
-      <ScreenHeader title="Upstairs" locationName={locationName} locationSlug={location} />
+      <ScreenHeader title={sides.counter.label} locationName={locationName} locationSlug={location} />
       <SoundBanner soundOn={feed.soundOn} onTurnOn={feed.turnSoundOn} offline={feed.offline} />
 
       <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-bold">Ask downstairs</h2>
+          <h2 className="text-lg font-bold">Ask {sides.kitchen.spoken}</h2>
           {buttons.length > 0 && (
             <button
               type="button"
@@ -190,7 +195,7 @@ export default function UpstairsScreen({
           <MessageBox
             value={customText}
             onChange={setCustomText}
-            label="Or type a message (read out loud downstairs)"
+            label="Or type a message (it gets read out loud)"
           />
           <button
             type="button"
@@ -220,6 +225,7 @@ export default function UpstairsScreen({
         loaded={feed.loaded}
         freshIds={feed.freshIds}
         onSeen={feed.markSeen}
+        sides={sides}
         emptyText="No orders yet. New ones will appear here and be read out."
       />
     </main>
