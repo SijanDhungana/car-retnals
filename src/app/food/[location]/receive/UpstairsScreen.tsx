@@ -7,6 +7,9 @@ import { postFoodOrder, useFoodFeed } from "../../_components/useFoodFeed";
 
 type Status = { kind: "ok" | "error"; text: string } | null;
 
+/** How many a request button asks for unless someone changes it. */
+const DEFAULT_REQUEST_QUANTITY = 3;
+
 /** Counter end (Front / Upstairs): hears orders, asks the kitchen for things. */
 export default function UpstairsScreen({
   location,
@@ -28,6 +31,7 @@ export default function UpstairsScreen({
   const [adding, setAdding] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [customText, setCustomText] = useState("");
+  const [requestQuantity, setRequestQuantity] = useState(DEFAULT_REQUEST_QUANTITY);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status>(null);
 
@@ -44,9 +48,16 @@ export default function UpstairsScreen({
     setBusy(true);
     setStatus(null);
     try {
-      await postFoodOrder({ location, target: "downstairs", kind, item });
-      setStatus({ kind: "ok", text: kind === "message" ? "Message sent" : `Asked for: ${item}` });
-      if (kind === "message") setCustomText("");
+      if (kind === "message") {
+        await postFoodOrder({ location, target: "downstairs", kind, item });
+        setStatus({ kind: "ok", text: "Message sent" });
+        setCustomText("");
+      } else {
+        const quantity = requestQuantity;
+        await postFoodOrder({ location, target: "downstairs", kind, item, quantity });
+        setStatus({ kind: "ok", text: `Asked for: ${quantity} × ${item}` });
+        setRequestQuantity(DEFAULT_REQUEST_QUANTITY); // back to 3 for the next one
+      }
     } catch (error) {
       setStatus({
         kind: "error",
@@ -110,6 +121,33 @@ export default function UpstairsScreen({
             </button>
           )}
         </div>
+
+        {!editing && buttons.length > 0 && (
+          <div className="mb-3 flex items-center gap-3">
+            <span className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              How many
+            </span>
+            <button
+              type="button"
+              aria-label="One fewer"
+              onClick={() => setRequestQuantity((q) => Math.max(1, q - 1))}
+              className="h-12 w-12 rounded-xl border-2 border-slate-200 bg-white text-2xl font-bold"
+            >
+              −
+            </button>
+            <span className="w-10 text-center text-2xl font-bold tabular-nums">
+              {requestQuantity}
+            </span>
+            <button
+              type="button"
+              aria-label="One more"
+              onClick={() => setRequestQuantity((q) => Math.min(50, q + 1))}
+              className="h-12 w-12 rounded-xl border-2 border-slate-200 bg-white text-2xl font-bold"
+            >
+              +
+            </button>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {buttons.map((button) =>
